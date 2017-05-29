@@ -75,7 +75,9 @@ In his book on refactoring, Martin Fowler suggested a technique called "Extract 
 To my eye, this seems a little bit easier to follow. I’d like to imagine that Fowler would agree. I've got a `loadPage` method that worries itself about the concept of loading and filtering data, and it lets the other sections of the class worry about the details of what I want to do, so that `loadClass` can focus on the concepts, instead.
 With some of the noise cleared out of the way, it becomes easier to see that I can optimize away the second call for data, if `this.blogs` is null.
 
-There are still some real problems with this code, though. While most of them have gotten better, some have actually gotten worse.
+## However...
+
+There are still some real problems with this code. While most of them have gotten better, some have actually gotten worse.
 
 Have you spotted the likely security concern, yet? All of the code thusfar has been mutating `this.blogs` in place, and waiting for the `user` to be retrieved so that the list of blogs could be filtered. But that means the unfiltered list of blogs is likely being shown, while we’re waiting, given that we keep referring to `this.blogs` as the place to store view-friendly data. This is even harder to spot in the second example than the first. The code here is both easier and harder to maintain, for exactly that reason.
 
@@ -124,7 +126,9 @@ This time the component is absolutely tiny. It knows nothing about users or user
 
 The functions are all safe to be exported and tested, as they aren't tied to the functioning of any one class or any one class instance, so having access to them shouldn’t corrupt the behaviour of any running class instance. Each of these functions is built to take input and return output, without mutating the input or otherwise changing the outside world. Functional programmers call these “pure” functions. We can also see that there are a bunch of different purposes for these functions: some of them are very low-level, accessing and parsing JSON data; some of them operate at a business level, working with data that is important to the business and the product; some of them are focused on helping the view do its job.
 
-There are really only a couple of problems left. The first is that I don’t want to have to write these helper functions on every page. If they’ve now been made safe for reuse, I want to take advantage of that. Once I do that, I don’t want to manually pass a lot of data back and forth, between a lot of functions and objects; I would like a system that makes that aspect easier than passing `http` all the way through.
+## However...
+
+There are a couple of problems left. The first is that I don’t want to have to write these helper functions on every page. If they’ve now been made safe for reuse, I want to take advantage of that. Once I do that, I don’t want to manually pass a lot of data back and forth, between a lot of functions and objects; I would like a system that makes that aspect easier than passing `http` all the way through.
 
 Both of these problems can be solved via **Services**.
 
@@ -184,7 +188,7 @@ export const sortBlogsByDate = dir => blogs =>
   blogs.slice().sort(/* ... */);
 
 @Component({ /* ... */ }) class BlogPage implements OnInit {
-  private blogs = [];
+  private blogs: Blog[] = [];
   constructor (private blogService: AuthorizedBlogService) {}
   ngOnInit () { this.loadPage(); }
 
@@ -204,5 +208,39 @@ The real world may not be quite so cut and dry, but that is even more reason to 
 
 This pattern of automatically passing dependencies into objects that request them is called **Dependency Injection**. It's a powerful tool, and one that Angular is specifically built around. This comes with advantages and weaknesses, but for the purpose of this section, be sure to take advantage of Angular’s injector. There will be other chapters dedicated to removing some of the weaknesses of injector systems.
 
-With all of that said, you might wonder when *not* to use services, if they are so useful. When it comes to Angular, the answer is pretty straightforward: if you aren’t writing a Component, a Filter, a Module, or one of a few other specific types, you are likely writing something that could be a service (or could be extracted into one).
+With all of that said, you might wonder when *not* to use services, if they are so useful. When it comes to Angular, specifically, the answer is pretty straightforward: if you aren’t writing a Component, a Filter, a Module, or one of a few other specific types, you are likely writing something that could be a service (or could be extracted into one). That’s actually a pretty good thing, when you look at it in depth. In the early days of AngularJS, there was a lot of confusion over how to use directives, providers, factories, services, values, and controllers. Some with more obvious uses and boundaries but, for a newcomer, still daunting.
 
+## However...
+
+While there’s a lot to be said for the benefits of simplifying around the pattern of `@Injectable` services, there are some very important caveats.
+
+### Where did all of my design patterns from AngularJS / <server framework X> go?
+
+There are fewer cut and dry (/paste) solutions to use as templates for code. I get it. This is both good and bad, depending on your perspective. Personally, I find it lets me set styles for a project, which might fit the task at hand. Then I get to change strategies on the next project, if the previous styles would be cumbersome for the new one.
+
+This does mean more discipline and dilligence, good communication between developers, and a good understanding of coding practices _especially_ early in the project, and as new members come on.
+
+
+### Why do these two components leak data into one another, when they use the same service?
+
+This is because a service within a module is treated as a singleton. For reference, I don't mean singleton as a class with a private constructor which ensures only a single instance, on instantiation.
+
+```javascript
+// rather I mean this
+const singleInstance = {};
+// or this
+const onlyCalledOnce = getSomeObject();
+```
+
+Any class passed as an injectible service will be instantiated one time, and that cached value will be passed around to components that wish to use it.
+
+### Why don’t these two components leak data into one another, when they should be using the same service?
+
+When I said that a service was instantiated exactly once, I was mostly telling the truth.  
+Mostly.
+
+There is a big reason that this isn’t always the case. That reason is Modules. I’m going to punt at this point, and say that, without going down the rabbit-holes of the what and why of modules, that you can provide services downstream from where they are injected (“Provided”), but not upstream. If a service is provided in the `Parent` module, then the `Child` modules can receive the same instance. The `Grandparent` module, however, will not get access to that instance.
+
+The reasoning is largely to do with lazy-loading of content, bundling and the like. For lazy-loading to work, services can not be depended upon by systems where the service is only included after the fact; especially given that each module would be sharing the same instance, and the newly loaded module could be starting with a service in a completely arbitrary and unexpected state.
+
+For this reason, the services flow down through the dependency tree of modules/providers, as it’s known at the time of generation.
