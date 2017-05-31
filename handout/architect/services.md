@@ -234,6 +234,7 @@ const onlyCalledOnce = getSomeObject();
 
 Any class passed as an injectible service will be instantiated one time, and that cached value will be passed around to components that wish to use it.
 
+
 ### Why don’t these two components leak data into one another, when they should be using the same service?
 
 When I said that a service was instantiated exactly once, I was mostly telling the truth.  
@@ -244,3 +245,5 @@ There is a big reason that this isn’t always the case. That reason is Modules.
 The reasoning is largely to do with lazy-loading of content, bundling and the like. For lazy-loading to work, services can not be depended upon by systems where the service is only included after the fact; especially given that each module would be sharing the same instance, and the newly loaded module could be starting with a service in a completely arbitrary and unexpected state.
 
 For this reason, the services flow down through the dependency tree of modules/providers, as it’s known at the time of generation.
+
+
